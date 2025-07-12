@@ -1,0 +1,6 @@
+services:
+  build:
+    build: .
+    volumes:
+      - "$PWD/out:/v-out"
+    command: ["cp", "/build/out/php-linux.iso", "/v-out"]

@@ -1,0 +1,6 @@
+.idea/
+*.iml
+build/*
+!build/.gitkeep
+out/*
+!out/.gitkeep
