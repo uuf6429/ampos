@@ -1,3 +1,3 @@
-#!/bin/busybox
-echo "Running PHP..."
-#exec /bin/php /init.php
+#!/bin/sh
+php -v
+php /init.php

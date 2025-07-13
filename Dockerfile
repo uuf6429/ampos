@@ -2,45 +2,9 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# === 1. Install dependencies ===
-RUN apt-get update; \
-    apt-get install -y busybox-static; \
-    apt-get install -y \
-      build-essential \
-      musl-tools \
-      gcc \
-      git \
-      curl \
-      xz-utils \
-      busybox \
-      qemu-system-x86 \
-      grub-pc-bin xorriso \
-      cpio \
-      libncurses-dev \
-      flex \
-      bison \
-      libssl-dev \
-      bc \
-      file \
-      tree \
-      rsync \
-      zstd \
-      libelf-dev \
-      libonig-dev \
-      libonig5 \
-      libxml2-dev \
-      automake \
-      libtool \
-      pkg-config \
-      re2c; \
-    rm -rf /var/lib/apt/lists/*
-
-# === 2. Set working directory ===
-WORKDIR /build
-
-# === 3. Build kernel and PHP ===
+# Set up basics
 ENV KERNEL_VERSION=6.6.1
-ENV PHP_VERSION=8.3.0
+ENV PHP_VERSION=8.4.0
 ENV BUILD_DIR=/build
 ENV OUT_DIR=/build/out
 ENV ROOTFS_DIR=$BUILD_DIR/rootfs
@@ -49,16 +13,70 @@ ENV PHP_DIR=$BUILD_DIR/php
 ENV INITRAMFS_FILE=$OUT_DIR/initramfs.cpio.gz
 ENV ISO_DIR=$BUILD_DIR/iso
 ENV ISO_FILE=$OUT_DIR/php-linux.iso
-
+WORKDIR /build
+CMD ["/bin/bash"]
+RUN mkdir -p \
+      "$OUT_DIR" \
+      "$ROOTFS_DIR/bin" \
+      "$ROOTFS_DIR/dev" \
+      "$ROOTFS_DIR/etc" \
+      "$ROOTFS_DIR/proc" \
+      "$ROOTFS_DIR/sys";
 RUN set -eux
 
-RUN mkdir -p "$BUILD_DIR" "$OUT_DIR" "$ROOTFS_DIR/bin" "$ROOTFS_DIR/dev" "$ROOTFS_DIR/proc" "$ROOTFS_DIR/sys";
+# Install dependencies and tools
+RUN apt-get update; \
+    apt-get install -y busybox-static; \
+    apt-get install -y \
+      automake \
+      bc \
+      bison \
+      build-essential \
+      busybox \
+      cpio \
+      curl \
+      file \
+      flex \
+      gcc \
+      git \
+      grub-pc-bin \
+      libcurl4-openssl-dev \
+      libelf-dev \
+      libffi-dev \
+      libiconv-hook-dev \
+      libjpeg-dev \
+      libncurses-dev \
+      libonig-dev \
+      libonig5 \
+      libpng-dev \
+      libreadline-dev \
+      libsqlite3-dev \
+      libssl-dev \
+      libtidy-dev \
+      libtool \
+      libxml2-dev \
+      libxslt-dev \
+      libzip-dev \
+      pkg-config \
+      re2c \
+      sqlite3 \
+      tree \
+      xorriso \
+      xz-utils \
+      zstd; \
+    rm -rf /var/lib/apt/lists/*;
+COPY tools/ /tmp/tools/
+RUN for fileName in /tmp/tools/*.sh; do \
+      destination="/bin/$(basename "$fileName" .sh)"; \
+      cp "$fileName" "$destination"; \
+      chmod +x "$destination"; \
+    done;
 
 # Download and build Linux kernel
 RUN cd "$BUILD_DIR"; \
     curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz; \
     tar -xvf linux-$KERNEL_VERSION.tar.xz; \
-    mv linux-$KERNEL_VERSION linux
+    mv linux-$KERNEL_VERSION linux;
 RUN cd "$KERNEL_DIR"; \
     make defconfig; \
     scripts/config --enable CONFIG_FB; \
@@ -73,60 +91,84 @@ RUN cd "$KERNEL_DIR"; \
     cp arch/x86/boot/bzImage "$OUT_DIR/vmlinuz";
 
 # Download and build PHP
-#RUN cd "$BUILD_DIR"; \
-#    curl -LO https://www.php.net/distributions/php-${PHP_VERSION}.tar.xz; \
-#    tar -xf php-${PHP_VERSION}.tar.xz; \
-#    mv php-${PHP_VERSION} php
-#RUN cd "$PHP_DIR"; \
-#    export CC="musl-gcc"; \
-#    export CFLAGS="-static"; \
-#    export CXXFLAGS="-static"; \
-#    export LDFLAGS="-Bstatic"; \
-#    ./buildconf --force; \
-#    ./configure \
-#      --disable-all \
-#      --enable-cli \
-#      --disable-shared \
-#      --disable-cgi  \
-#      --disable-fpm \
-#      --prefix="$PHP_DIR/build"
-#RUN cd "$PHP_DIR"; \
-#    export CC="musl-gcc"; \
-#    export CFLAGS="-static"; \
-#    export CXXFLAGS="-static"; \
-#    export LDFLAGS="-Bstatic"; \
-#    make clean; \
-#    make -j"$(nproc)"; \
-#    make install
-#RUN cd $ROOTFS_DIR/bin; \
-#    cp "$PHP_DIR/build/bin/php" php; \
-#    chmod +x php; \
-#    mkdir -p "$ROOTFS_DIR/lib"; \
-#    cp "/usr/lib/x86_64-linux-gnu/linux-vdso.so.1" "$ROOTFS_DIR/lib/" # TODO
+RUN cd "$BUILD_DIR"; \
+    curl -LO https://www.php.net/distributions/php-${PHP_VERSION}.tar.xz; \
+    tar -xf php-${PHP_VERSION}.tar.xz; \
+    mv php-${PHP_VERSION} php;
+RUN cd "$PHP_DIR"; \
+    ./buildconf --force; \
+    ./configure \
+      --disable-all \
+      --enable-cli \
+      --enable-dom \
+      --enable-filter \
+      --enable-json \
+      --enable-pcntl \
+      --enable-pdo \
+      --enable-phar \
+      --enable-zip \
+      --disable-shared \
+      --disable-cgi \
+      --disable-fpm \
+      --with-apcu \
+      --with-curl \
+      --with-dom \
+      --with-gd \
+      --with-ffi \
+      --with-iconv \
+      --with-jpeg \
+      --with-mbstring \
+      --with-libxml \
+      --with-opcache \
+      --with-openssl \
+      --with-pdo \
+      --with-pdo-sqlite \
+      --with-config-file-path=/etc/ \
+      --with-png \
+      --with-readline \
+      --with-sqlite3 \
+      --with-tidy \
+      --with-xsl \
+      --prefix="$PHP_DIR/build";
+RUN cd "$PHP_DIR"; \
+    make -j"$(nproc)"; \
+    make install;
+RUN cd $ROOTFS_DIR; \
+    cp "$PHP_DIR/build/bin/php" bin/php; \
+    chmod +x bin/php; \
+    copy-shared-libs "$ROOTFS_DIR/bin/php" "$ROOTFS_DIR";
+COPY "php.ini" "$ROOTFS_DIR/etc/php.ini"
+
+# Download and install Composer
+RUN "$PHP_DIR/build/bin/php" -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"; \
+    "$PHP_DIR/build/bin/php" -r "if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'.PHP_EOL; } else { echo 'Installer corrupt'.PHP_EOL; unlink('composer-setup.php'); exit(1); }"; \
+    "$PHP_DIR/build/bin/php" composer-setup.php; \
+    "$PHP_DIR/build/bin/php" -r "unlink('composer-setup.php');"; \
+    mv composer.phar "$ROOTFS_DIR/bin/composer";
 
 # Set up busybox shell
 RUN cd $ROOTFS_DIR/bin; \
-    cp /bin/busybox busybox; \
-    chmod +x busybox; \
     cp /bin/busybox sh; \
     chmod +x sh; \
-    mkdir -p "$ROOTFS_DIR/lib/x86_64-linux-gnu"; \
-    mkdir -p "$ROOTFS_DIR/lib64"; \
-    cp "/usr/lib/x86_64-linux-gnu/libresolv.so.2" "$ROOTFS_DIR/lib/x86_64-linux-gnu/"; \
-    cp "/usr/lib/x86_64-linux-gnu/libc.so.6" "$ROOTFS_DIR/lib/x86_64-linux-gnu/"; \
-    cp "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" "$ROOTFS_DIR/lib64/"; \
-    cd $ROOTFS_DIR; \
-    cp /bin/busybox init; \
-    chmod +x init
+    copy-shared-libs "$ROOTFS_DIR/bin/sh" "$ROOTFS_DIR";
 
-# Init script
-#COPY "init.sh" "$ROOTFS_DIR/init"
-#RUN chmod +x "$ROOTFS_DIR/init"
+# Set up init script
+COPY "init.sh" "$ROOTFS_DIR/init"
 COPY "init.php" "$ROOTFS_DIR/init.php"
+RUN chmod +x "$ROOTFS_DIR/init";
+
+# Set up PHP kernel
+COPY "src/" "$ROOTFS_DIR/src/"
+COPY "composer.*" "$ROOTFS_DIR/"
+COPY "vendor/" "$ROOTFS_DIR/vendor/"
+RUN cd "$ROOTFS_DIR"; \
+    bin/php bin/composer validate --ansi --check-lock --with-dependencies --strict; \
+    bin/php bin/composer install --ansi --no-progress --no-dev; \
+    bin/php bin/composer dump-autoload --optimize --apcu;
 
 # Create initramfs
 RUN cd "$ROOTFS_DIR"; \
-    find . -print0 | cpio --null -ov --format=newc | gzip -9 > "$INITRAMFS_FILE"
+    find . -print0 | cpio --null -ov --format=newc | gzip -9 > "$INITRAMFS_FILE";
 
 # Create bootable ISO
 RUN cd "$ROOTFS_DIR"; \
@@ -140,7 +182,4 @@ RUN cd "$ROOTFS_DIR"; \
     echo '  linux /boot/vmlinuz loglevel=7 console=tty0' >> "$ISO_DIR/boot/grub/grub.cfg"; \
     echo '  initrd /boot/initramfs.gz' >> "$ISO_DIR/boot/grub/grub.cfg"; \
     echo '}' >> "$ISO_DIR/boot/grub/grub.cfg"; \
-    grub-mkrescue -o "$ISO_FILE" "$ISO_DIR" 2>/dev/null
-
-# === 4. Default CMD ===
-CMD ["/bin/bash"]
+    grub-mkrescue -o "$ISO_FILE" "$ISO_DIR" 2>/dev/null;

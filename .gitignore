@@ -4,3 +4,5 @@ build/*
 !build/.gitkeep
 out/*
 !out/.gitkeep
+
+/vendor/

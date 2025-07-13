@@ -1,0 +1,22 @@
+{
+    "name": "uuf6429/ampos",
+    "description": "PHP Kernel based on a minimal linux system",
+    "type": "project",
+    "require": {
+        "php": "^8.4",
+        "ext-ffi": "*",
+        "ext-readline": "*"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "uuf6429\\AMPOS\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Christian Sciberras",
+            "email": "christian@sciberras.me"
+        }
+    ]
+}
