@@ -3,56 +3,74 @@
 namespace uuf6429\AMPOS;
 
 use FFI;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 final class Kernel
 {
     private static Kernel $instance;
     public private(set) bool $shuttingDown = false;
 
-    private function __construct()
-    {
+    public function __construct(
+        private readonly LoggerInterface $logger,
+        private readonly SymfonyStyle $console,
+    ) {
+        self::$instance?->panic('Kernel already initialized');
 
+        self::$instance = $this;
     }
 
     public static function getInstance(): self
     {
-        return self::$instance ??= new self();
+        return self::$instance;
     }
 
-    /**
-     * @todo Eventually make it into an infinite loop
-     */
     public function run(): void
     {
-        for ($i = 5; $i > 0; $i--) {
-            $this->writeMsg("Shutting down in $i...");
+        pcntl_async_signals(true);
+
+        pcntl_signal(SIGCHLD, function (): void {
+            while (($pid = pcntl_waitpid(-1, $status, WNOHANG)) > 0) {
+                $this->logger->debug("Reaped child PID $pid with status $status");
+            }
+        });
+
+        pcntl_signal(SIGTERM, function () {
+            $this->logger->notice('Shutdown requested (SIGTERM)');
+            $this->exit();
+        });
+
+        $this->logger->info('Supervisor running as PID ' . posix_getpid());
+
+        // TODO do kernel bootstrap
+
+        while (true) {
+            // TODO do kernel loop stuff
             sleep(1);
         }
-
-        readline('Press enter to power off...');
-
-        $this->exit();
     }
 
-    public function panic(string $message): void
+    public function panic(string $message): never
     {
-        $this->writeErr("PANIC: $message");
+        $this->logger->critical("PANIC: $message");
         $this->abort();
     }
 
     /**
      * Shuts down the system gracefully - closing (and waiting for) any running processes, cleaning up resources etc.
      */
-    public function exit(): void
+    public function exit(): never
     {
         if ($this->shuttingDown) {
             $this->panic('Already shutting down!');
         }
 
         $this->shuttingDown = true;
-        $this->writeMsg('Shutting down...');
+        $this->logger->notice('Shutting down...');
 
         // TODO here trigger events and wait for services to close
+
+        $this->console->askHidden('Press [RETURN] to power off...');
 
         $this->powerOff();
     }
@@ -60,25 +78,16 @@ final class Kernel
     /**
      * Immediately power-off the system, without any cleaning up.
      */
-    public function abort(): void
+    public function abort(): never
     {
-        $this->writeMsg('Terminating...');
+        $this->logger->emergency('Terminating...');
         $this->powerOff();
     }
 
-    private function powerOff(): void
+    private function powerOff(): never
     {
         $ffi = FFI::cdef('int reboot(int);');
         $ffi->reboot(0x4321fedc); // LINUX_REBOOT_CMD_POWER_OFF
-    }
-
-    private function writeMsg(string $message): void
-    {
-        file_put_contents('php://stdout', "$message\n");
-    }
-
-    private function writeErr(string $message): void
-    {
-        file_put_contents('php://stderr', "$message\n");
+        exit;
     }
 }
