@@ -29,6 +29,8 @@ final class Kernel
             sleep(1);
         }
 
+        readline('Press enter to power off...');
+
         $this->exit();
     }
 

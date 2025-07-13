@@ -15,14 +15,15 @@ ENV ISO_DIR=$BUILD_DIR/iso
 ENV ISO_FILE=$OUT_DIR/php-linux.iso
 WORKDIR /build
 CMD ["/bin/bash"]
-RUN mkdir -p \
-      "$OUT_DIR" \
-      "$ROOTFS_DIR/bin" \
-      "$ROOTFS_DIR/dev" \
-      "$ROOTFS_DIR/etc" \
-      "$ROOTFS_DIR/proc" \
-      "$ROOTFS_DIR/sys";
-RUN set -eux
+COPY "rootfs/" "$ROOTFS_DIR/"
+RUN set -eux; \
+    mkdir -p "$OUT_DIR"; \
+    rm -rf "$ROOTFS_DIR/**/.gitkeep"; \
+    find "$ROOTFS_DIR/bin/" -type f -exec chmod +x {} +; \
+    chmod +x "$ROOTFS_DIR/init";
+
+COPY "scripts/copy-shared-libs.sh" "/bin/copy-shared-libs"
+RUN chmod +x "/bin/copy-shared-libs";
 
 # Install dependencies and tools
 RUN apt-get update; \
@@ -65,12 +66,6 @@ RUN apt-get update; \
       xz-utils \
       zstd; \
     rm -rf /var/lib/apt/lists/*;
-COPY tools/ /tmp/tools/
-RUN for fileName in /tmp/tools/*.sh; do \
-      destination="/bin/$(basename "$fileName" .sh)"; \
-      cp "$fileName" "$destination"; \
-      chmod +x "$destination"; \
-    done;
 
 # Download and build Linux kernel
 RUN cd "$BUILD_DIR"; \
@@ -137,7 +132,6 @@ RUN cd $ROOTFS_DIR; \
     cp "$PHP_DIR/build/bin/php" bin/php; \
     chmod +x bin/php; \
     copy-shared-libs "$ROOTFS_DIR/bin/php" "$ROOTFS_DIR";
-COPY "php.ini" "$ROOTFS_DIR/etc/php.ini"
 
 # Download and install Composer
 RUN "$PHP_DIR/build/bin/php" -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"; \
@@ -151,11 +145,6 @@ RUN cd $ROOTFS_DIR/bin; \
     cp /bin/busybox sh; \
     chmod +x sh; \
     copy-shared-libs "$ROOTFS_DIR/bin/sh" "$ROOTFS_DIR";
-
-# Set up init script
-COPY "init.sh" "$ROOTFS_DIR/init"
-COPY "init.php" "$ROOTFS_DIR/init.php"
-RUN chmod +x "$ROOTFS_DIR/init";
 
 # Set up PHP kernel
 COPY "src/" "$ROOTFS_DIR/src/"

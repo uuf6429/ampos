@@ -18,5 +18,14 @@
             "name": "Christian Sciberras",
             "email": "christian@sciberras.me"
         }
-    ]
+    ],
+    "config": {
+        "process-timeout": -1
+    },
+    "scripts": {
+        "clean": "@php scripts/clean.php",
+        "build": "docker compose up --build --abort-on-container-failure --yes",
+        "start": "@php scripts/run-vb-vm.php",
+        "clean-start": ["@clean", "@build", "@start"]
+    }
 }
