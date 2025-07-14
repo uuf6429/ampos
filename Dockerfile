@@ -16,24 +16,19 @@ ENV ISO_FILE=$OUT_DIR/php-linux.iso
 WORKDIR /build
 CMD ["/bin/bash"]
 COPY "rootfs/" "$ROOTFS_DIR/"
-RUN set -eux; \
-    mkdir -p "$OUT_DIR"; \
-    rm -rf "$ROOTFS_DIR/**/.gitkeep"; \
-    find "$ROOTFS_DIR/bin/" -type f -exec chmod +x {} +; \
-    chmod +x "$ROOTFS_DIR/init";
+RUN set -eux \
+ && mkdir -p "$OUT_DIR" \
+ && rm -rf "$ROOTFS_DIR/**/.gitkeep" \
+ && find "$ROOTFS_DIR/bin/" -type f -exec chmod +x {} +
 
-COPY "scripts/copy-shared-libs.sh" "/bin/copy-shared-libs"
-RUN chmod +x "/bin/copy-shared-libs";
-
-# Install dependencies and tools
-RUN apt-get update; \
-    apt-get install -y busybox-static; \
-    apt-get install -y \
+# Install tools and dependencies
+COPY "tools/" "/tools/"
+RUN apt-get update \
+ && apt-get install -y \
       automake \
       bc \
       bison \
       build-essential \
-      busybox \
       cpio \
       curl \
       file \
@@ -58,42 +53,47 @@ RUN apt-get update; \
       libxml2-dev \
       libxslt-dev \
       libzip-dev \
+      php \
       pkg-config \
       re2c \
       sqlite3 \
       tree \
       xorriso \
       xz-utils \
-      zstd; \
-    rm -rf /var/lib/apt/lists/*;
+      zstd \
+ && rm -rf /var/lib/apt/lists/*
 
 # Download and build Linux kernel
-RUN cd "$BUILD_DIR"; \
-    curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz; \
-    tar -xvf linux-$KERNEL_VERSION.tar.xz; \
-    mv linux-$KERNEL_VERSION linux;
-RUN cd "$KERNEL_DIR"; \
-    make defconfig; \
-    scripts/config --enable CONFIG_FB; \
-    scripts/config --enable CONFIG_FB_VESA; \
-    scripts/config --enable CONFIG_FB_SIMPLE; \
-    scripts/config --enable CONFIG_FB_DEFERRED_IO; \
-    scripts/config --enable CONFIG_DRM; \
-    scripts/config --enable CONFIG_DRM_VMWGFX; \
-    scripts/config --enable CONFIG_DRM_KMS_HELPER; \
-    scripts/config --enable CONFIG_DRM_FBDEV_EMULATION; \
-    make -j"$(nproc)" bzImage; \
-    cp arch/x86/boot/bzImage "$OUT_DIR/vmlinuz";
+RUN cd "$BUILD_DIR" \
+ && curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz \
+ && tar -xvf linux-$KERNEL_VERSION.tar.xz \
+ && mv linux-$KERNEL_VERSION linux
+RUN cd "$KERNEL_DIR" \
+ && make defconfig \
+ && scripts/config --enable CONFIG_FB \
+ && scripts/config --enable CONFIG_FB_VESA \
+ && scripts/config --enable CONFIG_FB_SIMPLE \
+ && scripts/config --enable CONFIG_FB_DEFERRED_IO \
+ && scripts/config --enable CONFIG_DRM \
+ && scripts/config --enable CONFIG_DRM_VMWGFX \
+ && scripts/config --enable CONFIG_DRM_KMS_HELPER \
+ && scripts/config --enable CONFIG_DRM_FBDEV_EMULATION \
+ && make -j"$(nproc)" bzImage \
+ && cp arch/x86/boot/bzImage "$OUT_DIR/vmlinuz"
 
 # Download and build PHP
-RUN cd "$BUILD_DIR"; \
-    curl -LO https://www.php.net/distributions/php-${PHP_VERSION}.tar.xz; \
-    tar -xf php-${PHP_VERSION}.tar.xz; \
-    mv php-${PHP_VERSION} php;
-RUN cd "$PHP_DIR"; \
-    ./buildconf --force; \
-    ./configure \
+RUN cd "$BUILD_DIR" \
+ && curl -LO https://www.php.net/distributions/php-${PHP_VERSION}.tar.xz \
+ && tar -xf php-${PHP_VERSION}.tar.xz \
+ && mv php-${PHP_VERSION} php
+RUN cd "$PHP_DIR" \
+ && ./buildconf --force \
+ && php /tools/patch-php-cli.php "$PHP_DIR/sapi/cli/php_cli.c" \
+ && ./configure \
       --disable-all \
+      --disable-cgi \
+      --disable-fpm \
+      --disable-shared \
       --enable-cli \
       --enable-dom \
       --enable-filter \
@@ -101,11 +101,10 @@ RUN cd "$PHP_DIR"; \
       --enable-pcntl \
       --enable-pdo \
       --enable-phar \
+      --enable-posix \
       --enable-zip \
-      --disable-shared \
-      --disable-cgi \
-      --disable-fpm \
       --with-apcu \
+      --with-config-file-path=/etc/ \
       --with-curl \
       --with-dom \
       --with-gd \
@@ -118,57 +117,51 @@ RUN cd "$PHP_DIR"; \
       --with-openssl \
       --with-pdo \
       --with-pdo-sqlite \
-      --with-config-file-path=/etc/ \
       --with-png \
       --with-readline \
       --with-sqlite3 \
       --with-tidy \
       --with-xsl \
-      --prefix="$PHP_DIR/build";
-RUN cd "$PHP_DIR"; \
-    make -j"$(nproc)"; \
-    make install;
-RUN cd $ROOTFS_DIR; \
-    cp "$PHP_DIR/build/bin/php" bin/php; \
-    chmod +x bin/php; \
-    copy-shared-libs "$ROOTFS_DIR/bin/php" "$ROOTFS_DIR";
+      --prefix="$PHP_DIR/build"
+RUN cd "$PHP_DIR" \
+ && make -j"$(nproc)" \
+ && make install
+RUN cd $ROOTFS_DIR \
+ && cp "$PHP_DIR/build/bin/php" "$ROOTFS_DIR/bin/php" \
+ && chmod +x "$ROOTFS_DIR/bin/php" \
+ && sh /tools/copy-shared-libs.sh "$ROOTFS_DIR/bin/php" "$ROOTFS_DIR"
 
 # Download and install Composer
-RUN "$PHP_DIR/build/bin/php" -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"; \
-    "$PHP_DIR/build/bin/php" -r "if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'.PHP_EOL; } else { echo 'Installer corrupt'.PHP_EOL; unlink('composer-setup.php'); exit(1); }"; \
-    "$PHP_DIR/build/bin/php" composer-setup.php; \
-    "$PHP_DIR/build/bin/php" -r "unlink('composer-setup.php');"; \
-    mv composer.phar "$ROOTFS_DIR/bin/composer";
-
-# Set up busybox shell
-RUN cd $ROOTFS_DIR/bin; \
-    cp /bin/busybox sh; \
-    chmod +x sh; \
-    copy-shared-libs "$ROOTFS_DIR/bin/sh" "$ROOTFS_DIR";
+RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
+ && php -r "if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'.PHP_EOL; } else { echo 'Installer corrupt'.PHP_EOL; unlink('composer-setup.php'); exit(1); }" \
+ && php composer-setup.php \
+ && php -r "unlink('composer-setup.php');" \
+ && mv composer.phar "$ROOTFS_DIR/bin/composer"
 
 # Set up PHP kernel
 COPY "src/" "$ROOTFS_DIR/src/"
 COPY "composer.*" "$ROOTFS_DIR/"
 COPY "vendor/" "$ROOTFS_DIR/vendor/"
-RUN cd "$ROOTFS_DIR"; \
-    bin/php bin/composer validate --ansi --check-lock --with-dependencies --strict; \
-    bin/php bin/composer install --ansi --no-progress --no-dev; \
-    bin/php bin/composer dump-autoload --optimize --apcu;
+RUN cd "$ROOTFS_DIR" \
+ && ln -sf ./bin/php "$ROOTFS_DIR/init" \
+ && bin/php bin/composer validate --ansi --check-lock --with-dependencies --strict \
+ && bin/php bin/composer install --ansi --no-progress --no-dev \
+ && bin/php bin/composer dump-autoload --optimize --apcu
 
 # Create initramfs
-RUN cd "$ROOTFS_DIR"; \
-    find . -print0 | cpio --null -ov --format=newc | gzip -9 > "$INITRAMFS_FILE";
+RUN cd "$ROOTFS_DIR" \
+ && find . -print0 | cpio --null -ov --format=newc | gzip -9 > "$INITRAMFS_FILE"
 
 # Create bootable ISO
-RUN cd "$ROOTFS_DIR"; \
-    mkdir -p "$ISO_DIR/boot/grub"; \
-    cp "$OUT_DIR/vmlinuz" "$ISO_DIR/boot/vmlinuz"; \
-    cp "$INITRAMFS_FILE" "$ISO_DIR/boot/initramfs.gz"; \
-    echo 'timeout=0' > "$ISO_DIR/boot/grub/grub.cfg"; \
-    echo 'default=0' >> "$ISO_DIR/boot/grub/grub.cfg"; \
-    echo '' >> "$ISO_DIR/boot/grub/grub.cfg"; \
-    echo 'menuentry "PHP Linux" {' >> "$ISO_DIR/boot/grub/grub.cfg"; \
-    echo '  linux /boot/vmlinuz loglevel=7 console=tty0' >> "$ISO_DIR/boot/grub/grub.cfg"; \
-    echo '  initrd /boot/initramfs.gz' >> "$ISO_DIR/boot/grub/grub.cfg"; \
-    echo '}' >> "$ISO_DIR/boot/grub/grub.cfg"; \
-    grub-mkrescue -o "$ISO_FILE" "$ISO_DIR" 2>/dev/null;
+RUN cd "$ROOTFS_DIR" \
+ && mkdir -p "$ISO_DIR/boot/grub" \
+ && cp "$OUT_DIR/vmlinuz" "$ISO_DIR/boot/vmlinuz" \
+ && cp "$INITRAMFS_FILE" "$ISO_DIR/boot/initramfs.gz" \
+ && echo 'timeout=0' > "$ISO_DIR/boot/grub/grub.cfg" \
+ && echo 'default=0' >> "$ISO_DIR/boot/grub/grub.cfg" \
+ && echo '' >> "$ISO_DIR/boot/grub/grub.cfg" \
+ && echo 'menuentry "PHP Linux" {' >> "$ISO_DIR/boot/grub/grub.cfg" \
+ && echo '  linux /boot/vmlinuz loglevel=7 console=tty0' >> "$ISO_DIR/boot/grub/grub.cfg" \
+ && echo '  initrd /boot/initramfs.gz' >> "$ISO_DIR/boot/grub/grub.cfg" \
+ && echo '}' >> "$ISO_DIR/boot/grub/grub.cfg" \
+ && grub-mkrescue -o "$ISO_FILE" "$ISO_DIR" 2>/dev/null

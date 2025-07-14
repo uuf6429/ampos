@@ -20,7 +20,7 @@ function run(string $cmd): string
 
 if (!str_contains(run('VBoxManage list vms'), "\"$vmName\"")) {
     run("VBoxManage createvm --name=\"$vmName\" --platform-architecture=x86 --register");
-    run("VBoxManage modifyvm \"$vmName\" --memory=2048 --cpus=2 --ostype=Linux26_64 --vram=160 --usb=on --nic1 nat");
+    run("VBoxManage modifyvm \"$vmName\" --memory=2048 --cpus=2 --ostype=Linux26_64 --graphicscontroller vmsvga --vram=160 --usb=on --nic1 nat");
     run("VBoxManage storagectl \"$vmName\" --name=SATA-Controller --add=sata --controller=IntelAhci --portcount=1");
     run("VBoxManage storageattach \"$vmName\" --storagectl=SATA-Controller --port=0 --device=0 --type=dvddrive --medium=\"$isoFile\"");
 } elseif (str_contains(run('VBoxManage list runningvms'), "\"$vmName\"")) {
