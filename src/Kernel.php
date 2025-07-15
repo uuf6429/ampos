@@ -13,9 +13,11 @@ final class Kernel
 
     public function __construct(
         private readonly LoggerInterface $logger,
-        private readonly SymfonyStyle $console,
+        private readonly SymfonyStyle    $console,
     ) {
-        self::$instance?->panic('Kernel already initialized');
+        if (isset(self::$instance)) {
+            $this->panic('Kernel already initialized');
+        }
 
         self::$instance = $this;
     }

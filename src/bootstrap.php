@@ -38,16 +38,5 @@ register_shutdown_function(static function (): void {
 require __DIR__ . '/../vendor/autoload.php';
 
 $console = new SymfonyStyle(new ArgvInput(),new ConsoleOutput());
-$logger = new Logger(
-    'system',
-    [
-        new ConsoleLogger($console),
-        new RotatingFileHandler('/log/system.log', 90),
-    ],
-    [
-        new PsrLogMessageProcessor(),
-        new IntrospectionProcessor(),
-        new ProcessIdProcessor(),
-    ]
-);
+$logger = new SystemLogger($console);
 new uuf6429\AMPOS\Kernel($logger, $console)->run();
