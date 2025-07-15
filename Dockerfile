@@ -138,6 +138,11 @@ RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
  && php -r "unlink('composer-setup.php');" \
  && mv composer.phar "$ROOTFS_DIR/bin/composer"
 
+# Download and install Psysh
+RUN curl -L0 https://psysh.org/psysh \
+ && mv psysh "$ROOTFS_DIR/bin/psysh" \
+ && chmod +x "$ROOTFS_DIR/bin/psysh"
+
 # Set up PHP kernel
 COPY "src/" "$ROOTFS_DIR/src/"
 COPY "composer.*" "$ROOTFS_DIR/"

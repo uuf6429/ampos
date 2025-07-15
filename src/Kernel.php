@@ -5,6 +5,7 @@ namespace uuf6429\AMPOS;
 use FFI;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Process\Process;
 
 final class Kernel
 {
@@ -14,7 +15,8 @@ final class Kernel
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly SymfonyStyle    $console,
-    ) {
+    )
+    {
         if (isset(self::$instance)) {
             $this->panic('Kernel already initialized');
         }
@@ -44,7 +46,7 @@ final class Kernel
 
         $this->logger->info('Supervisor running as PID ' . posix_getpid());
 
-        // TODO do kernel bootstrap
+        $this->startShell(); // TODO do kernel bootstrap
 
         while (true) {
             // TODO do kernel loop stuff
@@ -91,5 +93,14 @@ final class Kernel
         $ffi = FFI::cdef('int reboot(int);');
         $ffi->reboot(0x4321fedc); // LINUX_REBOOT_CMD_POWER_OFF
         exit;
+    }
+
+    private function startShell(): void
+    {
+        $shell = new Process(['/bin/psysh']);
+        $shell->setTty(true);
+        $shell->setTimeout(null);
+        $shell->setInput('/');
+        $shell->mustRun();
     }
 }

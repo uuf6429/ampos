@@ -10,7 +10,11 @@
         "ext-readline": "*",
         "psr/log": "^3.0",
         "monolog/monolog": "^3.9",
-        "symfony/console": "^7.3"
+        "symfony/console": "^7.3",
+        "symfony/process": "^7.3"
+    },
+    "require-dev": {
+        "roave/security-advisories": "dev-latest"
     },
     "license": "MIT",
     "autoload": {
