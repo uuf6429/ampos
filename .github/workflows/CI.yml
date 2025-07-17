@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: docker-compose run --rm <service_name>
+      - run: docker-compose run --rm build
         # language=bash
       - run: |
           if [ -f "out/ampos.iso" ]; then
