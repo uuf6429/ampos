@@ -1,7 +1,7 @@
 <?php
 
 $vmName = 'ampos';
-$isoFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'out' . DIRECTORY_SEPARATOR . 'php-linux.iso';
+$isoFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'out' . DIRECTORY_SEPARATOR . 'ampos.iso';
 
 function run(string $cmd): string
 {

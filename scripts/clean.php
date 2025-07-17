@@ -1,5 +1,5 @@
 <?php
 
-if (file_exists(__DIR__ . '/out/php-linux.iso')) {
-    unlink(__DIR__ . '/out/php-linux.iso');
+if (file_exists(__DIR__ . '/out/ampos.iso')) {
+    unlink(__DIR__ . '/out/ampos.iso');
 }

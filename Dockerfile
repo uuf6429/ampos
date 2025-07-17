@@ -12,7 +12,7 @@ ENV KERNEL_DIR=$BUILD_DIR/linux
 ENV PHP_DIR=$BUILD_DIR/php
 ENV INITRAMFS_FILE=$OUT_DIR/initramfs.cpio.gz
 ENV ISO_DIR=$BUILD_DIR/iso
-ENV ISO_FILE=$OUT_DIR/php-linux.iso
+ENV ISO_FILE=$OUT_DIR/ampos.iso
 WORKDIR /build
 CMD ["/bin/bash"]
 RUN set -eux \
