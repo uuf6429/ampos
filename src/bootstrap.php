@@ -1,14 +1,9 @@
 <?php
 
-use Monolog\Handler\RotatingFileHandler;
-use Monolog\Logger;
-use Monolog\Processor\IntrospectionProcessor;
-use Monolog\Processor\ProcessIdProcessor;
-use Monolog\Processor\PsrLogMessageProcessor;
 use Symfony\Component\Console\Input\ArgvInput;
-use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use uuf6429\AMPOS\LinuxFFI;
 use uuf6429\AMPOS\Logger\SystemLogger;
 
 set_error_handler(static function (int $severity, string $message, ?string $file = null, ?int $line = null): bool {
@@ -37,6 +32,6 @@ register_shutdown_function(static function (): void {
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$console = new SymfonyStyle(new ArgvInput(),new ConsoleOutput());
+$console = new SymfonyStyle(new ArgvInput(), new ConsoleOutput());
 $logger = new SystemLogger($console);
 new uuf6429\AMPOS\Kernel($logger, $console)->run();

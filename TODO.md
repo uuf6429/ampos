@@ -5,4 +5,4 @@
 - [ ] Set up PHP-CS-Fixer
 - [ ] Set up PHPStan
 - [ ] Set up concept of services (also relates to Psysh)
-- [ ] 
+- [ ] Hard-coded German keyboard layout

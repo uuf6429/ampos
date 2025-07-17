@@ -15,11 +15,9 @@ ENV ISO_DIR=$BUILD_DIR/iso
 ENV ISO_FILE=$OUT_DIR/php-linux.iso
 WORKDIR /build
 CMD ["/bin/bash"]
-COPY "rootfs/" "$ROOTFS_DIR/"
 RUN set -eux \
  && mkdir -p "$OUT_DIR" \
- && rm -rf "$ROOTFS_DIR/**/.gitkeep" \
- && find "$ROOTFS_DIR/bin/" -type f -exec chmod +x {} +
+ && mkdir -p "$ROOTFS_DIR/bin"
 
 # Install tools and dependencies
 COPY "tools/" "/tools/"
@@ -36,6 +34,7 @@ RUN apt-get update \
       gcc \
       git \
       grub-pc-bin \
+      kbd \
       libcurl4-openssl-dev \
       libelf-dev \
       libffi-dev \
@@ -70,6 +69,9 @@ RUN cd "$BUILD_DIR" \
  && mv linux-$KERNEL_VERSION linux
 RUN cd "$KERNEL_DIR" \
  && make defconfig \
+ && loadkeys --mktable --unicode de > drivers/tty/vt/defkeymap.c \
+ && cp drivers/tty/vt/defkeymap.c_shipped "$OUT_DIR/defkeymap.old.c" \
+ && cp drivers/tty/vt/defkeymap.c "$OUT_DIR/defkeymap.new.c" \
  && scripts/config --enable CONFIG_FB \
  && scripts/config --enable CONFIG_FB_VESA \
  && scripts/config --enable CONFIG_FB_SIMPLE \
@@ -77,7 +79,8 @@ RUN cd "$KERNEL_DIR" \
  && scripts/config --enable CONFIG_DRM \
  && scripts/config --enable CONFIG_DRM_VMWGFX \
  && scripts/config --enable CONFIG_DRM_KMS_HELPER \
- && scripts/config --enable CONFIG_DRM_FBDEV_EMULATION \
+ && scripts/config --enable CONFIG_DRM_FBDEV_EMULATION
+RUN cd "$KERNEL_DIR" \
  && make -j"$(nproc)" bzImage \
  && cp arch/x86/boot/bzImage "$OUT_DIR/vmlinuz"
 
@@ -102,6 +105,7 @@ RUN cd "$PHP_DIR" \
       --enable-pdo \
       --enable-phar \
       --enable-posix \
+      --enable-tokenizer \
       --enable-zip \
       --with-apcu \
       --with-config-file-path=/etc/ \
@@ -139,9 +143,18 @@ RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
  && mv composer.phar "$ROOTFS_DIR/bin/composer"
 
 # Download and install Psysh
-RUN curl -L0 https://psysh.org/psysh \
+RUN curl -LO https://psysh.org/psysh \
  && mv psysh "$ROOTFS_DIR/bin/psysh" \
  && chmod +x "$ROOTFS_DIR/bin/psysh"
+
+# Set up required binaries
+RUN cd "$ROOTFS_DIR" \
+ && cp /bin/stty "$ROOTFS_DIR/bin/" \
+ && sh /tools/copy-shared-libs.sh "$ROOTFS_DIR/bin/stty" "$ROOTFS_DIR" \
+ && cp /bin/env "$ROOTFS_DIR/bin/" \
+ && sh /tools/copy-shared-libs.sh "$ROOTFS_DIR/bin/env" "$ROOTFS_DIR" \
+ && mkdir -p "$ROOTFS_DIR/usr/bin" \
+ && ln -sf ./bin/env "$ROOTFS_DIR/usr/bin/env"
 
 # Set up PHP kernel
 COPY "src/" "$ROOTFS_DIR/src/"

@@ -3,4 +3,4 @@ services:
     build: .
     volumes:
       - "$PWD/out:/v-out"
-    command: ["cp", "/build/out/php-linux.iso", "/v-out"]
+    command: ["cp", "-R", "/build/out/.", "/v-out/"]
